@@ -1,0 +1,104 @@
+# Celebrity Audio Extraction - Modern Dependencies
+# Updated: October 31, 2025
+# Python 3.10 - 3.12 compatible
+
+# ============================================
+# Core Scientific Computing
+# ============================================
+numpy>=1.24.0,<2.0.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+
+# ============================================
+# Computer Vision - Modern Stack
+# ============================================
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0  # For advanced tracking algorithms
+mediapipe>=0.10.8  # NEW: SOTA face mesh with 478 landmarks
+Pillow>=10.0.0
+imageio>=2.31.0  # Replaces deprecated scipy.misc.imread
+
+# ============================================
+# Deep Learning Frameworks
+# ============================================
+torch>=2.1.0,<2.3.0
+torchvision>=0.16.0
+torchaudio>=2.1.0  # For audio processing
+
+# ONNX for optimized inference
+onnxruntime-gpu>=1.16.0; platform_machine == 'x86_64'  # Use GPU if available
+onnxruntime>=1.16.0; platform_machine != 'x86_64'  # CPU fallback
+
+# ============================================
+# Face Recognition - SOTA
+# ============================================
+insightface>=0.7.3  # UPDATED: Modern face recognition
+onnx>=1.15.0
+
+# Optional: For legacy compatibility
+# mxnet>=1.9.1  # Only if needed for old models
+
+# ============================================
+# Audio Processing
+# ============================================
+librosa>=0.10.0  # Modern audio analysis
+soundfile>=0.12.0
+python-speech-features>=0.6  # MFCC extraction
+scipy>=1.11.0  # Audio I/O
+
+# ============================================
+# Utilities & Visualization
+# ============================================
+tqdm>=4.66.0  # Progress bars
+matplotlib>=3.7.0  # Visualization
+seaborn>=0.12.0  # Statistical visualization
+pyyaml>=6.0  # Configuration files
+colorama>=0.4.6  # Colored terminal output
+
+# ============================================
+# Development & Testing (Optional)
+# ============================================
+pytest>=7.4.0  # Unit testing
+black>=23.7.0  # Code formatting
+flake8>=6.1.0  # Linting
+ipython>=8.14.0  # Interactive development
+
+# ============================================
+# Optional Enhancements
+# ============================================
+# Uncomment if adding lip sync generation capability:
+# face-alignment>=1.4.0  # For Wav2Lip
+# gdown>=4.7.0  # Download pre-trained models from Google Drive
+
+# ============================================
+# System-Specific Notes
+# ============================================
+# For GPU support:
+#   - Install CUDA 11.8 or 12.x
+#   - torch with CUDA: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#
+# For CPU-only:
+#   - Use torch CPU version
+#   - Replace onnxruntime-gpu with onnxruntime
+#
+# For macOS with Apple Silicon:
+#   - torch supports MPS acceleration
+#   - Some packages may need arm64 wheels
+
+# ============================================
+# Installation Instructions
+# ============================================
+# 1. Create virtual environment:
+#    python3.10 -m venv venv
+#    source venv/bin/activate  # Linux/Mac
+#    venv\Scripts\activate  # Windows
+#
+# 2. Install dependencies:
+#    pip install --upgrade pip
+#    pip install -r requirements.txt
+#
+# 3. Install system dependencies:
+#    Ubuntu/Debian: sudo apt-get install ffmpeg libsm6 libxext6 libxrender-dev
+#    MacOS: brew install ffmpeg
+#    Windows: Download ffmpeg from https://ffmpeg.org/download.html
