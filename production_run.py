@@ -59,6 +59,8 @@ class VideoJobConfig:
     detection_confidence: float = 0.5
     recognition_threshold: float = 0.252
     speaking_threshold: float = 0.5
+    min_segment_duration: float = 2.0  # Minimum segment duration in seconds
+    merge_gap: float = 1.0  # Maximum gap to merge segments in seconds
 
 
 @dataclass
@@ -150,7 +152,9 @@ class ProductionPipeline:
             results = self.pipeline.process_video(
                 video_path=video_path,
                 max_frames=config.max_frames,
-                show_progress=True
+                show_progress=True,
+                min_segment_duration=config.min_segment_duration,
+                merge_gap=config.merge_gap
             )
             
             processing_time = time.time() - start_time
@@ -606,6 +610,12 @@ Examples:
     parser.add_argument('--recognition-threshold', type=float, default=0.252, help='Face recognition threshold')
     parser.add_argument('--speaking-threshold', type=float, default=0.5, help='Speaking detection threshold')
     
+    # Segment extraction options
+    parser.add_argument('--min-segment-duration', type=float, default=2.0, 
+                       help='Minimum duration (seconds) for speaking segments (default: 1.0)')
+    parser.add_argument('--merge-gap', type=float, default=1.0,
+                       help='Maximum gap (seconds) between segments to merge them (default: 0.5)')
+    
     args = parser.parse_args()
     
     # Initialize pipeline
@@ -641,7 +651,9 @@ Examples:
             max_frames=args.max_frames,
             detection_confidence=args.detection_confidence,
             recognition_threshold=args.recognition_threshold,
-            speaking_threshold=args.speaking_threshold
+            speaking_threshold=args.speaking_threshold,
+            min_segment_duration=args.min_segment_duration,
+            merge_gap=args.merge_gap
         )
     
     elif args.video_list:
@@ -655,7 +667,9 @@ Examples:
             max_frames=args.max_frames,
             detection_confidence=args.detection_confidence,
             recognition_threshold=args.recognition_threshold,
-            speaking_threshold=args.speaking_threshold
+            speaking_threshold=args.speaking_threshold,
+            min_segment_duration=args.min_segment_duration,
+            merge_gap=args.merge_gap
         )
     
     if not configs:

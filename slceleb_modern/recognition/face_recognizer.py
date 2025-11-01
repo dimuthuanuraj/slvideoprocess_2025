@@ -303,30 +303,41 @@ class ModernFaceRecognizer:
             512D embedding vector or None if no face detected
         """
         try:
-            # If bbox provided, use it to extract face region
-            if bbox is not None:
-                x1, y1, x2, y2 = map(int, bbox[:4])
-                # Add margin
-                h, w = image.shape[:2]
-                margin = 20
-                x1 = max(0, x1 - margin)
-                y1 = max(0, y1 - margin)
-                x2 = min(w, x2 + margin)
-                y2 = min(h, y2 + margin)
-                
-                face_img = image[y1:y2, x1:x2]
-                
-                # Detect face in cropped region
-                faces = self.app.get(face_img)
-            else:
-                # Detect face in full image
-                faces = self.app.get(image)
+            # Always detect faces in full image (better detection)
+            faces = self.app.get(image)
             
             if len(faces) == 0:
                 return None
             
-            # Return embedding of first (largest) face
-            return faces[0].embedding
+            # If bbox provided, find the face that matches it best
+            if bbox is not None:
+                x1, y1, x2, y2 = map(int, bbox[:4])
+                bbox_center = np.array([(x1 + x2) / 2, (y1 + y2) / 2])
+                
+                # Find face with center closest to bbox center
+                best_face = None
+                min_dist = float('inf')
+                
+                for face in faces:
+                    face_bbox = face.bbox.astype(int)
+                    face_center = np.array([
+                        (face_bbox[0] + face_bbox[2]) / 2,
+                        (face_bbox[1] + face_bbox[3]) / 2
+                    ])
+                    dist = np.linalg.norm(bbox_center - face_center)
+                    
+                    if dist < min_dist:
+                        min_dist = dist
+                        best_face = face
+                
+                # Only use if reasonably close (within 100 pixels)
+                if best_face is not None and min_dist < 100:
+                    return best_face.embedding
+                else:
+                    return None
+            else:
+                # No bbox provided, return first (largest) face
+                return faces[0].embedding
             
         except Exception as e:
             logger.error(f"Error getting embedding: {e}")

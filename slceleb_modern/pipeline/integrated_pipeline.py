@@ -115,8 +115,14 @@ class VideoResults:
     # Speaking segments (start_time, end_time, confidence)
     speaking_segments: List[Tuple[float, float, float]] = field(default_factory=list)
     
-    def compute_summary(self):
-        """Compute summary statistics from frame results"""
+    def compute_summary(self, min_segment_duration: float = 2.0, merge_gap: float = 1.0):
+        """
+        Compute summary statistics from frame results.
+        
+        Args:
+            min_segment_duration: Minimum duration (seconds) for segments to keep
+            merge_gap: Maximum gap (seconds) between segments to merge them
+        """
         self.frames_with_poi = sum(1 for r in self.frame_results if r.poi_present)
         self.frames_with_poi_speaking = sum(1 for r in self.frame_results if r.poi_speaking)
         
@@ -124,7 +130,7 @@ class VideoResults:
             self.avg_processing_fps = len(self.frame_results) / self.total_processing_time
         
         # Extract speaking segments (consecutive frames where POI is speaking)
-        self.speaking_segments = []
+        raw_segments = []
         segment_start = None
         segment_start_idx = None
         segment_confidences = []
@@ -142,7 +148,7 @@ class VideoResults:
                     # End current segment - use previous frame's timestamp
                     segment_end = self.frame_results[i - 1].timestamp if i > 0 else segment_start
                     avg_confidence = np.mean(segment_confidences) if segment_confidences else 0.0
-                    self.speaking_segments.append((segment_start, segment_end, float(avg_confidence)))
+                    raw_segments.append((segment_start, segment_end, float(avg_confidence)))
                     segment_start = None
                     segment_start_idx = None
                     segment_confidences = []
@@ -151,7 +157,35 @@ class VideoResults:
         if segment_start is not None:
             segment_end = self.frame_results[-1].timestamp
             avg_confidence = np.mean(segment_confidences) if segment_confidences else 0.0
-            self.speaking_segments.append((segment_start, segment_end, float(avg_confidence)))
+            raw_segments.append((segment_start, segment_end, float(avg_confidence)))
+        
+        # Merge segments with small gaps between them
+        merged_segments = []
+        if raw_segments:
+            current_start, current_end, confidences = raw_segments[0][0], raw_segments[0][1], [raw_segments[0][2]]
+            
+            for i in range(1, len(raw_segments)):
+                start, end, conf = raw_segments[i]
+                gap = start - current_end
+                
+                if gap <= merge_gap:
+                    # Merge with current segment
+                    current_end = end
+                    confidences.append(conf)
+                else:
+                    # Save current segment and start new one
+                    merged_segments.append((current_start, current_end, float(np.mean(confidences))))
+                    current_start, current_end, confidences = start, end, [conf]
+            
+            # Add final segment
+            merged_segments.append((current_start, current_end, float(np.mean(confidences))))
+        
+        # Filter segments by minimum duration
+        self.speaking_segments = [
+            (start, end, conf) 
+            for start, end, conf in merged_segments 
+            if (end - start) >= min_segment_duration
+        ]
     
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
@@ -275,7 +309,9 @@ class IntegratedPipeline:
         video_path: str,
         max_frames: Optional[int] = None,
         skip_frames: int = 0,
-        show_progress: bool = True
+        show_progress: bool = True,
+        min_segment_duration: float = 2.0,
+        merge_gap: float = 1.0
     ) -> VideoResults:
         """
         Process video through full pipeline.
@@ -285,6 +321,8 @@ class IntegratedPipeline:
             max_frames: Maximum frames to process (None = all)
             skip_frames: Number of frames to skip at start
             show_progress: Whether to show progress messages
+            min_segment_duration: Minimum duration (seconds) for speaking segments
+            merge_gap: Maximum gap (seconds) between segments to merge
             
         Returns:
             VideoResults with complete processing results
@@ -362,9 +400,9 @@ class IntegratedPipeline:
         finally:
             cap.release()
         
-        # Compute summary
+        # Compute summary with segment merging and filtering
         results.total_processing_time = time.time() - start_time
-        results.compute_summary()
+        results.compute_summary(min_segment_duration=min_segment_duration, merge_gap=merge_gap)
         
         logger.info(f"\n{'='*80}")
         logger.info(f"Processing Complete!")
