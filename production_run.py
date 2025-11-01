@@ -155,13 +155,15 @@ class ProductionPipeline:
             
             processing_time = time.time() - start_time
             
-            # Calculate statistics
-            total_frames = len(results)
-            poi_frames = sum(1 for r in results if r.has_poi)
-            speaking_frames = sum(1 for r in results if r.is_speaking)
+            # Calculate statistics from VideoResults object
+            total_frames = len(results.frame_results)
+            poi_frames = results.frames_with_poi
+            speaking_frames = results.frames_with_poi_speaking
+            segments = results.speaking_segments
             
-            # Extract speaking segments
-            segments = self.pipeline.extract_speaking_segments(results)
+            # Extract speaking segments if not already done
+            if not segments and hasattr(self.pipeline, 'extract_speaking_segments'):
+                segments = self.pipeline.extract_speaking_segments(results.frame_results)
             
             # Save results
             output_dir = Path(config.output_dir)
@@ -219,23 +221,36 @@ class ProductionPipeline:
                 error_message=error_msg
             )
     
-    def _save_results_json(self, results: List, segments: List, output_path: Path):
+    def _save_results_json(self, results, segments: List, output_path: Path):
         """Save processing results to JSON."""
+        # Handle both VideoResults object and list of FrameResult
+        if hasattr(results, 'frame_results'):
+            frame_results = results.frame_results
+            total_frames = len(frame_results)
+            poi_frames = results.frames_with_poi
+            speaking_frames = results.frames_with_poi_speaking
+        else:
+            frame_results = results
+            total_frames = len(results)
+            poi_frames = sum(1 for r in results if r.poi_present)
+            speaking_frames = sum(1 for r in results if r.poi_speaking)
+        
         data = {
-            'total_frames': len(results),
-            'poi_frames': sum(1 for r in results if r.has_poi),
-            'speaking_frames': sum(1 for r in results if r.is_speaking),
+            'total_frames': total_frames,
+            'poi_frames': poi_frames,
+            'speaking_frames': speaking_frames,
             'speaking_segments': len(segments),
-            'segments': [
+            'segments': segments,  # Already in correct format from VideoResults
+            'frame_results': [
                 {
-                    'start_frame': seg['start_frame'],
-                    'end_frame': seg['end_frame'],
-                    'duration': seg['duration'],
-                    'avg_confidence': seg['avg_confidence']
+                    'frame': r.frame_idx,
+                    'timestamp': r.timestamp,
+                    'poi_present': r.poi_present,
+                    'poi_speaking': r.poi_speaking,
+                    'num_faces': len(r.face_bboxes)
                 }
-                for seg in segments
-            ],
-            'frame_results': [r.to_dict() for r in results]
+                for r in frame_results
+            ]
         }
         
         with open(output_path, 'w') as f:
@@ -246,42 +261,61 @@ class ProductionPipeline:
     def _save_speaking_segments(
         self, 
         video_path: str, 
-        segments: List[Dict],
+        segments: List,
         output_dir: Path
     ) -> List[str]:
-        """Extract and save speaking segments as separate video files."""
+        """Extract and save speaking segments as separate video files with audio."""
+        import subprocess
+        
+        # Get video FPS for time calculation
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
         
         segment_files = []
         video_stem = Path(video_path).stem
         
         for i, segment in enumerate(segments):
-            start_frame = segment['start_frame']
-            end_frame = segment['end_frame']
+            # Handle both tuple (start_time, end_time, confidence) and dict formats
+            if isinstance(segment, tuple):
+                start_time, end_time, confidence = segment
+            else:
+                start_frame = segment['start_frame']
+                end_frame = segment['end_frame']
+                start_time = start_frame / fps
+                end_time = end_frame / fps
+            
+            duration = end_time - start_time
             
             # Create output file
             segment_file = output_dir / f"{video_stem}_segment_{i+1:03d}.mp4"
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(str(segment_file), fourcc, fps, (width, height))
             
-            # Seek to start frame
-            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+            # Use ffmpeg to extract segment with audio
+            # -ss: start time, -t: duration, -c copy: copy codecs without re-encoding
+            cmd = [
+                'ffmpeg',
+                '-y',  # Overwrite output file
+                '-ss', str(start_time),  # Start time
+                '-i', video_path,  # Input file
+                '-t', str(duration),  # Duration
+                '-c', 'copy',  # Copy streams without re-encoding (fast)
+                '-avoid_negative_ts', 'make_zero',  # Fix timestamp issues
+                str(segment_file)
+            ]
             
-            # Write frames
-            for frame_idx in range(start_frame, end_frame + 1):
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                out.write(frame)
-            
-            out.release()
-            segment_files.append(str(segment_file))
-            logger.info(f"Saved segment {i+1}: {segment_file}")
+            try:
+                # Run ffmpeg with suppressed output
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                segment_files.append(str(segment_file))
+                logger.info(f"Saved segment {i+1}: {segment_file}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to extract segment {i+1}: {e}")
         
-        cap.release()
         return segment_files
 
 

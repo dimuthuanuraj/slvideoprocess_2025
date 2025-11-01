@@ -223,6 +223,19 @@ class OptimizedFaceRecognizer:
         logger.info(f"\n✅ Loaded {len(self.poi_embeddings)}/{len(image_paths)} reference images")
         logger.info(f"   Embedding dimension: {len(self.poi_embeddings[0]) if self.poi_embeddings else 0}")
     
+    def load_reference_images(self, image_paths: List[str]) -> bool:
+        """
+        Alias for load_poi_references for compatibility.
+        
+        Args:
+            image_paths: List of paths to POI images
+            
+        Returns:
+            True if at least one image loaded successfully
+        """
+        self.load_poi_references(image_paths)
+        return len(self.poi_embeddings) > 0
+    
     def recognize_face(self, frame: np.ndarray, bbox: np.ndarray, frame_number: int = 0) -> RecognitionResult:
         """
         Recognize face with POI matching.

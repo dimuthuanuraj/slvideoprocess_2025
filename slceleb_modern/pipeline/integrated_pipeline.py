@@ -413,8 +413,8 @@ class IntegratedPipeline:
             for bbox in result.face_bboxes:
                 recognition = self.recognizer.recognize_face(frame, bbox)
                 
-                if recognition.is_match:
-                    result.face_identities.append("POI")
+                if recognition.is_poi:
+                    result.face_identities.append(recognition.person_id if hasattr(recognition, 'person_id') else "POI")
                     result.face_confidences.append(recognition.confidence)
                     
                     # Mark POI present
