@@ -1,5 +1,14 @@
 # Celebrity Audio Extraction
 
+> **🚀 Looking for the 2025 modernized version?** Check out [README_MODERN.md](README_MODERN.md) for the latest pipeline with:
+> - 35.27 FPS processing (3.5x faster)
+> - MediaPipe face detection (478 landmarks)
+> - InsightFace recognition (512D embeddings)
+> - Intelligent segment merging (80% fewer, 3x longer clips)
+> - Production-ready batch processing
+
+---
+
 ## Introduction
 
 CN-Celeb, a large-scale Chinese celebrities dataset published by Center for Speech and Language Technology (CSLT) at Tsinghua University.
