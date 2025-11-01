@@ -1,0 +1,11 @@
+{
+  "mediapipe": {
+    "method": "mediapipe",
+    "avg_fps": 32.27656389687599,
+    "total_faces_detected": 1881,
+    "avg_detection_time_ms": 30.982232284545898,
+    "avg_landmarks_per_face": 478,
+    "memory_usage_mb": 0.0,
+    "success_rate": 73.72
+  }
+}

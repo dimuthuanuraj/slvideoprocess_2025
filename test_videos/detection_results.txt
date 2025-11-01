@@ -1,0 +1,21 @@
+MediaPipe Face Detection - Test Results
+======================================================================
+
+Video: test_videos/sample_video.mp4
+Resolution: 1920x1080
+Source FPS: 50.00
+Frames processed: 300
+
+Performance:
+  Average FPS: 88.07
+  Average detection time: 11.35 ms
+  Std detection time: 18.43 ms
+
+Detection Quality:
+  Total faces: 1
+  Average faces per frame: 0.00
+  Success rate: 0.3%
+
+Face Count Distribution:
+  0 faces: 299 frames (99.7%)
+  1 faces: 1 frames (0.3%)
