@@ -1,0 +1,84 @@
+{
+  "batch_info": {
+    "total_videos": 3,
+    "successful": 3,
+    "failed": 0,
+    "success_rate": "100.0%",
+    "elapsed_time": "0:22:10.795442",
+    "start_time": "2025-11-01T21:25:29.484053",
+    "end_time": "2025-11-01T21:47:40.279506"
+  },
+  "processing_stats": {
+    "total_frames": 56927,
+    "total_processing_time": "1328.0s",
+    "average_fps": "42.87",
+    "total_poi_frames": 13405,
+    "total_speaking_frames": 3753,
+    "total_segments": 20
+  },
+  "failed_videos": [],
+  "video_results": [
+    {
+      "video_path": "test_videos/detection_result.mp4",
+      "success": true,
+      "frames_processed": 300,
+      "processing_time": 5.671474456787109,
+      "fps": 52.896297477102635,
+      "poi_detections": 0,
+      "poi_speaking_frames": 0,
+      "speaking_segments": 0,
+      "error_message": null,
+      "output_files": [
+        "output/detection_result/detection_result_results.json"
+      ]
+    },
+    {
+      "video_path": "test_videos/sample video2.mp4",
+      "success": true,
+      "frames_processed": 18053,
+      "processing_time": 409.16456174850464,
+      "fps": 44.12161190806251,
+      "poi_detections": 3903,
+      "poi_speaking_frames": 3753,
+      "speaking_segments": 20,
+      "error_message": null,
+      "output_files": [
+        "output/sample video2/sample video2_results.json",
+        "output/sample video2/sample video2_segment_001.mp4",
+        "output/sample video2/sample video2_segment_002.mp4",
+        "output/sample video2/sample video2_segment_003.mp4",
+        "output/sample video2/sample video2_segment_004.mp4",
+        "output/sample video2/sample video2_segment_005.mp4",
+        "output/sample video2/sample video2_segment_006.mp4",
+        "output/sample video2/sample video2_segment_007.mp4",
+        "output/sample video2/sample video2_segment_008.mp4",
+        "output/sample video2/sample video2_segment_009.mp4",
+        "output/sample video2/sample video2_segment_010.mp4",
+        "output/sample video2/sample video2_segment_011.mp4",
+        "output/sample video2/sample video2_segment_012.mp4",
+        "output/sample video2/sample video2_segment_013.mp4",
+        "output/sample video2/sample video2_segment_014.mp4",
+        "output/sample video2/sample video2_segment_015.mp4",
+        "output/sample video2/sample video2_segment_016.mp4",
+        "output/sample video2/sample video2_segment_017.mp4",
+        "output/sample video2/sample video2_segment_018.mp4",
+        "output/sample video2/sample video2_segment_019.mp4",
+        "output/sample video2/sample video2_segment_020.mp4"
+      ]
+    },
+    {
+      "video_path": "test_videos/sample_video.mp4",
+      "success": true,
+      "frames_processed": 38574,
+      "processing_time": 913.1821322441101,
+      "fps": 42.24129955894546,
+      "poi_detections": 9502,
+      "poi_speaking_frames": 0,
+      "speaking_segments": 0,
+      "error_message": null,
+      "output_files": [
+        "output/sample_video/sample_video_results.json"
+      ]
+    }
+  ]
+}

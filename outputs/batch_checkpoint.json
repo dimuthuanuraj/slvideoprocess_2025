@@ -1,0 +1,12 @@
+{
+  "start_time": "2025-11-01T21:25:29.484053",
+  "completed_videos": [
+    "test_videos/detection_result.mp4",
+    "test_videos/sample video2.mp4",
+    "test_videos/sample_video.mp4"
+  ],
+  "failed_videos": [],
+  "current_video": null,
+  "total_videos": 3,
+  "checkpoint_time": "2025-11-01T21:47:40.276956"
+}

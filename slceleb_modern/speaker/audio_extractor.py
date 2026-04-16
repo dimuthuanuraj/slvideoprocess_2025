@@ -120,13 +120,80 @@ class AudioFeatureExtractor:
         """
         try:
             logger.info(f"Loading audio from: {audio_path}")
-            self.audio, _ = librosa.load(
-                audio_path,
-                sr=self.sr,
-                offset=offset,
-                duration=duration,
-                mono=True
-            )
+            
+            # Try multiple methods for robustness
+            audio_loaded = False
+            
+            # Method 1: Try librosa directly (works for most audio files)
+            try:
+                self.audio, _ = librosa.load(
+                    audio_path,
+                    sr=self.sr,
+                    offset=offset,
+                    duration=duration,
+                    mono=True
+                )
+                audio_loaded = True
+                logger.info("✓ Audio loaded using librosa")
+            except Exception as e1:
+                logger.warning(f"librosa failed: {e1}")
+                
+                # Method 2: Try using OpenCV to extract audio from video
+                try:
+                    import subprocess
+                    import tempfile
+                    import os
+                    
+                    logger.info("Attempting to extract audio using ffmpeg...")
+                    
+                    # Create temporary file for extracted audio
+                    temp_audio = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+                    temp_audio.close()
+                    
+                    # Build ffmpeg command
+                    cmd = [
+                        'ffmpeg', '-y', '-i', audio_path,
+                        '-vn',  # No video
+                        '-acodec', 'pcm_s16le',  # PCM codec
+                        '-ar', str(self.sr),  # Sample rate
+                        '-ac', '1',  # Mono
+                    ]
+                    
+                    # Add offset and duration if specified
+                    if offset > 0:
+                        cmd.extend(['-ss', str(offset)])
+                    if duration is not None:
+                        cmd.extend(['-t', str(duration)])
+                    
+                    cmd.append(temp_audio.name)
+                    
+                    # Run ffmpeg
+                    result = subprocess.run(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=60
+                    )
+                    
+                    if result.returncode == 0 and os.path.exists(temp_audio.name):
+                        # Load extracted audio
+                        self.audio, _ = librosa.load(temp_audio.name, sr=self.sr, mono=True)
+                        audio_loaded = True
+                        logger.info("✓ Audio loaded using ffmpeg extraction")
+                    
+                    # Clean up temp file
+                    try:
+                        os.unlink(temp_audio.name)
+                    except:
+                        pass
+                        
+                except Exception as e2:
+                    logger.warning(f"ffmpeg extraction failed: {e2}")
+            
+            if not audio_loaded:
+                logger.error("All audio loading methods failed")
+                return False
+            
             self.duration = len(self.audio) / self.sr
             
             # Clear cache
@@ -134,7 +201,7 @@ class AudioFeatureExtractor:
             self._mel_spec_cache = None
             self._rms_cache = None
             
-            logger.info(f"Audio loaded: {self.duration:.2f}s, {len(self.audio)} samples")
+            logger.info(f"✓ Audio loaded successfully: {self.duration:.2f}s, {len(self.audio)} samples")
             return True
             
         except Exception as e:
