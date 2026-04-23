@@ -19,7 +19,21 @@ Phase: 2 - Face Detection & Tracking
 
 import cv2
 import numpy as np
-import mediapipe as mp
+try:
+    import mediapipe as mp
+    # Try new API first (0.10+)
+    try:
+        from mediapipe.tasks import python as mp_python
+        from mediapipe.tasks.python import vision
+        USE_NEW_API = True
+    except ImportError:
+        # Fall back to old API (< 0.10)
+        USE_NEW_API = False
+        if not hasattr(mp, 'solutions'):
+            raise ImportError("MediaPipe version incompatible. Please install mediapipe<0.10 or update code.")
+except ImportError:
+    raise ImportError("MediaPipe not installed. Install with: pip install mediapipe")
+
 from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
 import logging
@@ -104,9 +118,27 @@ class MediaPipeFaceDetector:
             min_tracking_confidence: Minimum confidence for landmark tracking (0.0-1.0)
             use_gpu: Whether to use GPU acceleration if available
         """
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.mp_drawing = mp.solutions.drawing_utils
-        self.mp_drawing_styles = mp.solutions.drawing_styles
+        # Handle different MediaPipe API versions
+        try:
+            # Try old API first (< 0.10)
+            self.mp_face_mesh = mp.solutions.face_mesh
+            self.mp_drawing = mp.solutions.drawing_utils
+            self.mp_drawing_styles = mp.solutions.drawing_styles
+        except AttributeError:
+            # Use new API (>= 0.10)
+            try:
+                from mediapipe.python.solutions import face_mesh as mp_face_mesh_module
+                from mediapipe.python.solutions import drawing_utils as mp_drawing_module
+                from mediapipe.python.solutions import drawing_styles as mp_drawing_styles_module
+                self.mp_face_mesh = mp_face_mesh_module
+                self.mp_drawing = mp_drawing_module
+                self.mp_drawing_styles = mp_drawing_styles_module
+            except ImportError:
+                # Last resort: import face_mesh directly
+                from mediapipe.python.solutions.face_mesh import FaceMesh
+                self.mp_face_mesh = type('obj', (object,), {'FaceMesh': FaceMesh})
+                self.mp_drawing = None
+                self.mp_drawing_styles = None
         
         self.static_image_mode = static_image_mode
         self.max_num_faces = max_num_faces

@@ -49,6 +49,7 @@ from slceleb_modern.speaker import (
     AudioFeatureExtractor,
     AudioVisualCorrelator
 )
+from insightface.app import FaceAnalysis
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -269,13 +270,30 @@ class IntegratedPipeline:
         logger.info(f"✓ Face Recognizer initialized ({recognition_model})")
         
         # Phase 4: Speaker Detection components
-        self.lip_tracker = LipTracker(window_size=30, fps=30.0)
-        self.audio_extractor = AudioFeatureExtractor(sr=16000, fps=30.0)
+        # fps defaults to 30.0 here; updated to actual video fps in process_video()
+        self._default_fps = 30.0
+        self.lip_tracker = LipTracker(window_size=int(self._default_fps), fps=self._default_fps)
+        self.audio_extractor = AudioFeatureExtractor(sr=16000, fps=self._default_fps)
         self.correlator = AudioVisualCorrelator(
-            window_size=30,
+            window_size=int(self._default_fps),
             speaking_threshold=speaking_threshold
         )
-        logger.info(f"✓ Speaker Detection initialized")
+        logger.info(f"✓ Speaker Detection initialized (will update FPS from video)")
+        
+        # InsightFace fallback detector for small/missed faces (uses lighter model)
+        try:
+            self.insightface_app = FaceAnalysis(
+                name='buffalo_s',
+                providers=['CPUExecutionProvider']
+            )
+            self.insightface_app.prepare(ctx_id=0, det_size=(320, 320))
+            self.has_insightface_fallback = True
+            self._last_insightface_result = None
+            self._last_insightface_frame = -10
+            logger.info(f"✓ InsightFace fallback detector initialized (buffalo_s, 320x320)")
+        except Exception as e:
+            self.has_insightface_fallback = False
+            logger.warning(f"InsightFace fallback not available: {e}")
         
         # State
         self.poi_loaded = False
@@ -358,6 +376,15 @@ class IntegratedPipeline:
         logger.info(f"Video: {total_video_frames} frames, {fps:.2f} FPS, {duration:.2f}s")
         logger.info(f"Processing: {max_frames} frames (skipping first {skip_frames})")
         
+        # Update ALL speaker detection components with actual video FPS
+        self.lip_tracker = LipTracker(window_size=int(fps), fps=fps)
+        self.audio_extractor.fps = fps
+        self.correlator = AudioVisualCorrelator(
+            window_size=int(fps),
+            speaking_threshold=self.speaking_threshold
+        )
+        logger.info(f"✓ Speaker detection FPS updated to {fps:.2f} (window={int(fps)} frames)")
+        
         # Initialize results
         results = VideoResults(
             video_path=video_path,
@@ -438,22 +465,79 @@ class IntegratedPipeline:
         detections = self.detector.detect(frame)
         result.faces_detected = len(detections)
         
+        # Fallback to InsightFace if MediaPipe found no faces (every 5th frame only for speed)
+        use_insightface_fallback = False
+        insightface_faces = []
+        if result.faces_detected == 0 and self.has_insightface_fallback:
+            if frame_idx % 5 == 0:
+                insightface_faces = self.insightface_app.get(frame)
+                if insightface_faces:
+                    result.faces_detected = len(insightface_faces)
+                    use_insightface_fallback = True
+                    self._last_insightface_result = insightface_faces
+                    self._last_insightface_frame = frame_idx
+                else:
+                    self._last_insightface_result = None
+            elif hasattr(self, '_last_insightface_result') and self._last_insightface_result is not None:
+                # Reuse recent InsightFace detection (within 5 frames)
+                if hasattr(self, '_last_insightface_frame') and (frame_idx - self._last_insightface_frame) < 5:
+                    insightface_faces = self._last_insightface_result
+                    result.faces_detected = len(insightface_faces)
+                    use_insightface_fallback = True
+        
         if result.faces_detected == 0:
             return result
         
         # Extract bboxes and landmarks
-        for detection in detections:
-            result.face_bboxes.append(detection.bbox)
-            result.face_landmarks.append(detection.landmarks_2d)
+        if use_insightface_fallback:
+            for face in insightface_faces:
+                result.face_bboxes.append(face.bbox.astype(int))
+                # InsightFace provides 68 landmarks; pad to 478x2 with zeros
+                # so lip tracker can still try (it will use outer lip indices)
+                lm = np.zeros((478, 2), dtype=np.float32)
+                if hasattr(face, 'landmark_2d_106') and face.landmark_2d_106 is not None:
+                    lm_106 = face.landmark_2d_106
+                    # Map 106-point landmarks to approximate MediaPipe positions
+                    # Outer lip: indices 52-71 in 106-point model
+                    lip_indices_106 = list(range(52, 72))
+                    mp_outer_lip = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375,
+                                    291, 185, 40, 39, 37, 0, 267, 269, 270, 409]
+                    for j, mp_idx in enumerate(mp_outer_lip[:len(lip_indices_106)]):
+                        if j < len(lip_indices_106):
+                            lm[mp_idx] = lm_106[lip_indices_106[j]]
+                result.face_landmarks.append(lm)
+        else:
+            for detection in detections:
+                result.face_bboxes.append(detection.bbox)
+                result.face_landmarks.append(detection.landmarks_2d)
         
         # Stage 2: Face Recognition (Phase 3)
         if self.poi_loaded:
-            for bbox in result.face_bboxes:
-                recognition = self.recognizer.recognize_face(frame, bbox)
+            for i, bbox in enumerate(result.face_bboxes):
+                # Use InsightFace embedding directly if available (fallback path)
+                is_poi = False
+                conf = 0.0
+                if use_insightface_fallback and i < len(insightface_faces):
+                    face_obj = insightface_faces[i]
+                    if hasattr(face_obj, 'embedding') and face_obj.embedding is not None:
+                        emb = face_obj.embedding / np.linalg.norm(face_obj.embedding)
+                        # Compare against POI embeddings
+                        for poi_emb in self.recognizer.poi_embeddings:
+                            poi_norm = poi_emb / np.linalg.norm(poi_emb)
+                            sim = float(np.dot(emb, poi_norm))
+                            if sim > conf:
+                                conf = sim
+                        if conf >= self.recognition_threshold:
+                            is_poi = True
                 
-                if recognition.is_poi:
-                    result.face_identities.append(recognition.person_id if hasattr(recognition, 'person_id') else "POI")
-                    result.face_confidences.append(recognition.confidence)
+                if not is_poi:
+                    recognition = self.recognizer.recognize_face(frame, bbox)
+                    is_poi = recognition.is_poi
+                    conf = recognition.confidence
+                
+                if is_poi:
+                    result.face_identities.append("POI")
+                    result.face_confidences.append(conf)
                     
                     # Mark POI present
                     if not result.poi_present:
@@ -479,8 +563,8 @@ class IntegratedPipeline:
                     lip_openings = self.lip_tracker.get_lip_opening_sequence()
                     motion_features = self.lip_tracker.get_motion_features()
                     
-                    # Get audio features
-                    start_frame = max(0, frame_idx - 29)
+                    # Get audio features (lookback = 1 second of frames)
+                    start_frame = max(0, frame_idx - (self.lip_tracker.window_size - 1))
                     audio_seq = self.audio_extractor.get_amplitude_envelope_sequence(
                         start_frame, frame_idx
                     )

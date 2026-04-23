@@ -145,6 +145,14 @@ class ProductionPipeline:
         start_time = time.time()
         
         try:
+            # Apply per-job thresholds to the pipeline
+            self.pipeline.detection_confidence = config.detection_confidence
+            self.pipeline.recognition_threshold = config.recognition_threshold
+            self.pipeline.speaking_threshold = config.speaking_threshold
+            self.pipeline.correlator.speaking_threshold = config.speaking_threshold
+            if hasattr(self.pipeline.recognizer, 'set_threshold'):
+                self.pipeline.recognizer.set_threshold(config.recognition_threshold)
+            
             # Load POI references
             self.pipeline.load_poi_references(config.poi_images)
             

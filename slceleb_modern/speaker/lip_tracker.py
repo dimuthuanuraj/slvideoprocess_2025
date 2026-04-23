@@ -273,9 +273,9 @@ class LipTracker:
         autocorr = autocorr / autocorr[0]
         
         # Look for peaks in typical speech frequency range
-        # Syllables: 3-8 Hz, so at 30 fps, peaks at lags 4-10 frames
-        min_lag = 4
-        max_lag = min(15, len(autocorr))
+        # Syllables: 3-8 Hz, so at fps, peaks at lags fps/8 to fps/3 frames
+        min_lag = max(2, int(self.fps / 8))
+        max_lag = min(int(self.fps / 2), len(autocorr))
         
         if max_lag <= min_lag:
             return 0.0

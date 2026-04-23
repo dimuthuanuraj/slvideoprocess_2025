@@ -1,2 +1,56 @@
+# Media files
 *.mp4
 *.wav
+*.avi
+*.mkv
+*.mov
+*.mp3
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+batch_checkpoint.json
+production_run.log
+
+# Output directories
+output/
+outputs/
+
+# Model files (large binaries)
+*.model
+*.pth
+*.ckpt
+*.h5
+*.pb
+
+# LaTeX build files
+*.aux
+*.out
+*.toc
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
